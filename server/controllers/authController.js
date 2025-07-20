@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
-import transporterfrom from "../config/nodemailer.js";
 import transporter from "../config/nodemailer.js";
+//register Function
 export const register = async (req, res) => {
   const { name, email, password } = req.body;
   console.log(req.body);
@@ -46,7 +46,7 @@ export const register = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
-
+//login Function
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -76,6 +76,7 @@ export const login = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
+//logout Function
 export const logout = async (req, res) => {
   try {
     res.clearCookie("token", {
@@ -88,56 +89,80 @@ export const logout = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
-
+//send otp Function
 export const sendVerifyOtp = async (req, res) => {
   try {
     const { userId } = req.body;
     const user = await userModel.findById(userId);
-    if (user.isAccountverified) {
-      return res.json({ succes: false, message: "Account Already Verified" });
+
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
     }
-    const otp = String(Math.floor(10000 + Math.random() * 90000));
+
+    if (user.isVerified) {
+      return res.json({ success: false, message: "Account Already Verified" });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit OTP
     user.verifyOtp = otp;
-    user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000;
+    user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
     await user.save();
+
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: user.email,
       subject: "Account Verification OTP",
-      text: `Your Verification OTP is ${otp}`,
+      text: `Your Verification OTP is ${otp}. This OTP will expire in 24 hours.`,
     };
+
     await transporter.sendMail(mailOptions);
-    res.json({ succes: true, message: "Verification OTP sent on mail" });
-  } catch {
-    res.json({ succes: false, message: error.message });
+    res.json({ success: true, message: "Verification OTP sent on mail" });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
   }
 };
-
+//verify by otp Function
 export const verifyEmail = async (req, res) => {
   const { userId, otp } = req.body;
-  if (!user || !otp) {
-    res.json({ succes: false, message: "Missing Details" });
+
+  if (!userId || !otp) {
+    return res.json({ success: false, message: "Missing Details" });
   }
+
   try {
     const user = await userModel.findById(userId);
+
     if (!user) {
       return res.json({
-        succes: false,
-        message: "user not found",
+        success: false,
+        message: "User not found",
       });
     }
+
     if (user.verifyOtp === "" || user.verifyOtp !== otp) {
-      res.json({ succes: false, message: "Invalid OTP" });
+      return res.json({ success: false, message: "Invalid OTP" });
     }
+
     if (user.verifyOtpExpireAt < Date.now()) {
-      res.json({ succes: false, message: "OTP Expired" });
+      return res.json({ success: false, message: "OTP Expired" });
     }
-    user.isAccountverified = true;
+
+    user.isVerified = true;
     user.verifyOtp = "";
     user.verifyOtpExpireAt = 0;
     await user.save();
-    return res.json({ succes: true, message: "Email verified Succesfully" });
+
+    return res.json({ success: true, message: "Email verified successfully" });
   } catch (error) {
-    res.json({ succes: false, message: error.message });
+    return res.json({ success: false, message: error.message });
+  }
+};
+
+//check authentication Function
+export const isAuthenticated = async (req, res) => {
+  try {
+    return res.json({ success: true });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
   }
 };
