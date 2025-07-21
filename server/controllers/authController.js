@@ -230,3 +230,35 @@ export const resetPassword = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
+// OAuth success handler
+export const oauthSuccess = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    // Set cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Redirect to frontend with success
+    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
+  } catch (error) {
+    console.error("OAuth success error:", error);
+    res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_error`);
+  }
+};
+
+// OAuth failure handler
+export const oauthFailure = (req, res) => {
+  res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_cancelled`);
+};
